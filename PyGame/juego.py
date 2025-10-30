@@ -1,7 +1,7 @@
 import pygame
 import random
 import sys
-import os # ⭐ Importación esencial para manejo de rutas de archivos
+import os 
 
 # --- 1. Inicialización de Pygame y Carga de Recursos ---
 pygame.init()
@@ -19,32 +19,52 @@ ALTO_PANTALLA = 600
 pantalla = pygame.display.set_mode((ANCHO_PANTALLA, ALTO_PANTALLA))
 pygame.display.set_caption("EcoCleaner: ¡Tu misión es un aire puro!")
 
-
+# Reloj y Fuente
 reloj = pygame.time.Clock()
 FPS = 30
 fuente = pygame.font.Font(None, 36)
 fuente_pequena = pygame.font.Font(None, 24)
 
-# ⭐ DEFINICIÓN DE RUTA ABSOLUTA Y CARGA DE IMÁGENES
-# Esto resuelve los errores NameError y FileNotFoundError
+# ⭐ DEFINICIÓN DE RUTAS Y CARGA DE RECURSOS ⭐
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__)) 
+
+# --- Carga de Imágenes (Sprites) ---
+IMAGEN_SPARKY = None 
+IMAGEN_NUBE_CO = None
+IMAGEN_NUBE_PURA = None
+
 try:
-    # 1. Obtiene la ruta de la carpeta donde se encuentra este script (juego.py)
-    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__)) 
-    
-    # 2. Carga las imágenes desde la subcarpeta 'img'
     IMAGEN_SPARKY = pygame.image.load(os.path.join(SCRIPT_DIR, "img", "sparky_robot.png")).convert_alpha() 
     IMAGEN_NUBE_CO = pygame.image.load(os.path.join(SCRIPT_DIR, "img", "nube_sucia.png")).convert_alpha()
     IMAGEN_NUBE_PURA = pygame.image.load(os.path.join(SCRIPT_DIR, "img", "nube_limpia.png")).convert_alpha()
-
     
 except pygame.error as e:
-    print(f"Error al cargar la imagen: {e}.")
-    print("Asegúrate de que los archivos estén en la carpeta 'img' y los nombres sean correctos.")
-    # Fallback: si las imágenes fallan, usamos None para que las clases usen el dibujo simple.
-    IMAGEN_SPARKY = None 
-    IMAGEN_NUBE_CO = None
-    IMAGEN_NUBE_PURA = None
-    
+    print(f"Error al cargar imagen: {e}. ¿Están los archivos en la carpeta 'img'?")
+
+# --- Carga de Sonidos ---
+SONIDO_RECOGER = None
+try:
+    # 🚨 1. REEMPLAZA "sonido_recoger.wav" con el nombre de tu archivo de efecto de sonido.
+    ruta_sonido = os.path.join(SCRIPT_DIR, "sonidos", "sonido_recoger.wav")
+    if os.path.exists(ruta_sonido):
+        SONIDO_RECOGER = pygame.mixer.Sound(ruta_sonido)
+    else:
+        print(f"Advertencia: Archivo de sonido no encontrado en {ruta_sonido}")
+except pygame.error as e:
+    print(f"Error al cargar SONIDO_RECOGER: {e}. Asegúrate de que el formato sea compatible (wav, mp3, ogg).")
+
+# --- Inicialización de Música de Fondo ---
+try:
+    # 🚨 2. REEMPLAZA "musica_fondo.mp3" con el nombre de tu archivo de música de fondo.
+    ruta_musica = os.path.join(SCRIPT_DIR, "sonidos", "musica_fondo.mp3")
+    if os.path.exists(ruta_musica):
+        pygame.mixer.music.load(ruta_musica)
+    else:
+        print(f"Advertencia: Archivo de música no encontrado en {ruta_musica}")
+except pygame.error as e:
+    print(f"Error al cargar música de fondo: {e}.")
+
+
 # Variable global para el gestor de juego
 gestor_juego = None 
 
@@ -109,7 +129,7 @@ class NubeCO(pygame.sprite.Sprite):
     def update(self):
         self.rect.y += self.velocidad_y
         
-        # ⭐ Lógica de pérdida de vida y reseteo
+        # Lógica de pérdida de vida y reseteo
         if self.rect.top > ALTO_PANTALLA:
             global gestor_juego
             if gestor_juego:
@@ -209,6 +229,10 @@ for i in range(10):
     nube = NubeCO()
     todos_los_sprites.add(nube)
     nubes_co.add(nube)
+    
+# Iniciar música de fondo
+if pygame.mixer.get_init() and not pygame.mixer.music.get_busy():
+    pygame.mixer.music.play(-1) # El -1 hace que se repita indefinidamente
 
 # --- 4. Bucle Principal del Juego ---
 jugando = True
@@ -247,6 +271,10 @@ while jugando:
             gestor_juego.puntuacion += 10
             gestor_juego.nivel_co = max(0, gestor_juego.nivel_co - 5)
             
+            # ⭐ SONIDO: Reproduce el efecto de sonido al recoger
+            if SONIDO_RECOGER:
+                SONIDO_RECOGER.play()
+            
             nube_pura = NubePura(nube_golpeada.rect.centerx, nube_golpeada.rect.centery)
             todos_los_sprites.add(nube_pura)
             nubes_puras.add(nube_pura)
@@ -259,7 +287,7 @@ while jugando:
             if random.random() < 0.2:
                 gestor_juego.mostrar_alerta(random.choice(mensajes))
             
-            # ⭐ Reaparición: Solo reaparece el 60% de las veces (para menos CO)
+            # Reaparición: Solo reaparece el 60% de las veces (para menos CO)
             if random.random() < 0.6: 
                 nube = NubeCO()
                 todos_los_sprites.add(nube)
@@ -269,10 +297,12 @@ while jugando:
         if gestor_juego.vidas <= 0:
              gestor_juego.juego_terminado = True
              gestor_juego.mostrar_alerta("¡Te has quedado sin vidas! Juego Terminado.")
+             pygame.mixer.music.stop() # Detener música al terminar
 
         if gestor_juego.nivel_co >= gestor_juego.max_co and not gestor_juego.juego_terminado:
             gestor_juego.juego_terminado = True
             gestor_juego.mostrar_alerta("¡Nivel de CO Crítico! Juego Terminado.")
+            pygame.mixer.music.stop() # Detener música al terminar
             
         if gestor_juego.juego_terminado:
              for nube in nubes_co:
